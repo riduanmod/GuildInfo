@@ -7,7 +7,6 @@ from datetime import datetime
 from flask import Flask, request, jsonify, Response
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
-
 import data_pb2
 import encode_id_clan_pb2
 
