@@ -7,14 +7,11 @@ from datetime import datetime
 from flask import Flask, request, jsonify, Response
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
-
-# প্রোটোবাফ ফাইলগুলো (অবশ্যই সার্ভারে এই ৪টি ফাইল থাকতে হবে)
 import data_pb2
 import encode_id_clan_pb2
 import my_pb2
 import output_pb2
 
-# গেম ভার্সন ভেরিয়েবল ইমপোর্ট করা হলো
 from game_version import (
     CLIENT_VERSION,
     CLIENT_VERSION_CODE,
@@ -25,33 +22,22 @@ from game_version import (
     ANDROID_OS_VERSION
 )
 
-# SSL Warning বন্ধ করার জন্য
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
 app.json.sort_keys = False
 
-# AES এনক্রিপশন কি (Key) এবং আইভি (IV) - Login এবং Clan Data উভয়ের জন্য
 AES_KEY = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
 AES_IV = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
 
-# =====================================================================
-# মাল্টি-সার্ভার অ্যাকাউন্ট কনফিগারেশন
-# =====================================================================
 ACCOUNTS = {
-    "BD": {"uid": "4715367181", "pass": "Riduan_6OT79_RiduanOfficialBD_HPW00"},
-    "IND": {"uid": "4715367908", "pass": "Riduan_LXHK5_RiduanOfficialBD_IWQ2T"},
-    "SG": {"uid": "4715368797", "pass": "Riduan_0OIXN_RiduanOfficialBD_5KKXG"},
-    "BR": {"uid": "4715369409", "pass": "Riduan_DCMHQ_RiduanOfficialBD_N685M"},
-    "SAC": {"uid": "4715371578", "pass": "Riduan_7OMWT_RiduanOfficialBD_W7EIF"},
-    "NA": {"uid": "4715372332", "pass": "Riduan_0GRTA_RiduanOfficialBD_G1EKA"},
-    "ME": {"uid": "4715373297", "pass": "Riduan_5N8UH_RiduanOfficialBD_135OI"},
-    "TH": {"uid": "4715373897", "pass": "Riduan_9QNA4_RiduanOfficialBD_YOBUF"},
-    "VN": {"uid": "4715374576", "pass": "Riduan_SZV28_RiduanOfficialBD_6U4B2"},
-    "US": {"uid": "4715376963", "pass": "Riduan_M4NWG_RiduanOfficialBD_7WV4U"}
+    "BD": {"uid": "4343645299", "pass": "C5C216587364AD7247730F433CABA4A5C91C6889BCCC2A4D8105E3D7297B5CE2"},
+    "IND": {"uid": "4356917206", "pass": "FD5364ADEF5CABF22B54D82235F5572C2AF42B65EC799CEC90FD9E4B3E32A318"},
+    "BR": {"uid": "4571117089", "pass": "C36429E131AAD3CDE6FBE4E6DBB58D424C3A9762763633B3E57AD668C05DFB21"},
+    "NA": {"uid": "5016711699", "pass": "C1267711DA562E2188ACEEE6A0EB424710112AD0DAE2E9853C61920C0E74D248"},
+    "ME": {"uid": "3763606630", "pass": "7FF33285F290DDB97D9A31010DCAA10C2021A03F27C4188A2F6ABA418426527C"}
 }
-
-# প্রতিটি সার্ভারের টোকেন আলাদাভাবে স্টোর করার জন্য ডিকশনারি
+    
 TOKENS = {server: {"token": None, "expiry": 0} for server in ACCOUNTS}
 
 def encrypt_message(plaintext, key_bytes, iv_bytes):
@@ -140,7 +126,7 @@ def major_login(access_token, open_id, platform_type=4):
                 data_dict = {field.name: getattr(example_msg, field.name)
                              for field in example_msg.DESCRIPTOR.fields
                              if field.name not in ["binary", "binary_data", "Garena420"]}
-            except:
+            except Exception:
                 data_dict = response.json()
 
             if data_dict and "token" in data_dict:
@@ -149,10 +135,7 @@ def major_login(access_token, open_id, platform_type=4):
     except Exception as e:
         return {"success": False, "error": f"MajorLogin error: {str(e)}"}
 
-############## TOKEN MANAGEMENT ##########
-
 def get_jwt_token(server):
-    # নির্দিষ্ট সার্ভারের টোকেন ভ্যালিড থাকলে সেটাই রিটার্ন করবে
     if TOKENS[server]["token"] and time.time() < TOKENS[server]["expiry"]:
         return TOKENS[server]["token"]
 
@@ -166,7 +149,7 @@ def get_jwt_token(server):
         jwt_result = major_login(access_result['access_token'], access_result['open_id'])
         if jwt_result['success']:
             TOKENS[server]["token"] = jwt_result['jwt_token']
-            TOKENS[server]["expiry"] = time.time() + (5 * 3600)  # ৫ ঘণ্টার জন্য ক্যাশ
+            TOKENS[server]["expiry"] = time.time() + (5 * 3600)
             return TOKENS[server]["token"]
         else:
             print(f"MajorLogin Error ({server}): {jwt_result.get('error')}")
@@ -174,10 +157,6 @@ def get_jwt_token(server):
         print(f"Access Token Error ({server}): {access_result.get('error')}")
             
     return None
-
-# =====================================================================
-# API ROUTES (Guild Info)
-# =====================================================================
 
 @app.route('/', methods=['GET'])
 def index():
@@ -190,11 +169,10 @@ def index():
         "API_Usage_Guide": {
             "Supported_Servers": list(ACCOUNTS.keys()),
             "API_Format": {
-                "Get_Clan_Info": "/guild?clan_id=[Clan_ID]&server=[Server_Code]"
+                "Get_Clan_Info": "/guild?clan_id=[Clan_ID]"
             },
             "Examples": {
-                "Default_BD": "/guild?clan_id=3036683032",
-                "Specific_Server": "/guild?clan_id=3036683032&server=IND"
+                "Auto_Detect": "/guild?clan_id=3036683032"
             }
         }
     }
@@ -203,25 +181,12 @@ def index():
 @app.route('/guild', methods=['GET'])
 def get_clan_info():
     clan_id = request.args.get('clan_id')
-    server = request.args.get('server', 'BD').upper() # ডিফল্ট সার্ভার BD
 
     if not clan_id:
         return jsonify({"error": "Clan ID is required"}), 400
     
-    if server not in ACCOUNTS:
-        return jsonify({"error": f"Invalid server. Supported servers: {', '.join(ACCOUNTS.keys())}"}), 400
-
-    current_token = get_jwt_token(server)
-    if not current_token:
-        return jsonify({"error": f"Failed to generate JWT token for {server}. Please try again."}), 500
-    
     try:
-        json_data = '''
-        {{
-            "1": {},
-            "2": 1
-        }}
-        '''.format(clan_id)
+        json_data = '{{\n    "1": {},\n    "2": 1\n}}'.format(clan_id)
         data_dict = json.loads(json_data)
         
         my_data = encode_id_clan_pb2.MyData()
@@ -232,74 +197,96 @@ def get_clan_info():
         encrypted_data = encrypt_message(data_bytes, AES_KEY[:16], AES_IV[:16])
         formatted_encrypted_data = ' '.join([f"{byte:02X}" for byte in encrypted_data])
         
-        url = "https://clientbp.ggblueshark.com/GetClanInfoByClanID"
         request_bytes = bytes.fromhex(formatted_encrypted_data.replace(" ", ""))
         
         headers = {
             "Expect": "100-continue",
-            "Authorization": f"Bearer {current_token}",
             "X-Unity-Version": UNITY_VERSION,
             "X-GA": "v1 1",
             "ReleaseVersion": RELEASE_VERSION.lower(),
             "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": f"Dalvik/2.1.0 (Linux; U; {ANDROID_OS_VERSION}; {USER_AGENT_MODEL} Build/RP1A.200720.012)",
-            "Host": "clientbp.ggblueshark.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip"
         }
         
-        response = requests.post(url, headers=headers, data=request_bytes, verify=False, timeout=60)
+        domains = [
+            "clientbp.ggpolarbear.com",
+            "clientbp.ggblueshark.com",
+            "clientbp.common.ggbluefox.com"
+        ]
+        
+        for server in ACCOUNTS.keys():
+            current_token = get_jwt_token(server)
+            if not current_token:
+                continue
+                
+            headers["Authorization"] = f"Bearer {current_token}"
             
-        if response.status_code == 200:
-            if response.content:
-                response_message = data_pb2.response()
-                response_message.ParseFromString(response.content)
-                timestamp1_normal = datetime.fromtimestamp(response_message.timestamp1)
-                timestamp2_normal = datetime.fromtimestamp(response_message.timestamp2)
-                
+            for domain in domains:
                 try:
-                    officers_list = json.loads(response_message.big_numbers) if response_message.big_numbers else []
-                except:
-                    officers_list = response_message.big_numbers
-
-                formatted_response = {
-                    "Developer": "Riduanul Islam",
-                    "TelegramBot": "https://t.me/RiduanFFBot",
-                    "TelegramChannel": "https://t.me/RiduanOfficialBD",
-                    "guild_info": {
-                        "guild_name": response_message.special_code,
-                        "guild_id": response_message.id,
-                        "level": response_message.rank,
-                        "region": response_message.region,
-                        "creation_date": timestamp1_normal.strftime("%Y-%m-%d %H:%M:%S"),
-                        "last_updated": timestamp2_normal.strftime("%Y-%m-%d %H:%M:%S")
-                    },
-                    "guild_members": {
-                        "max_capacity": response_message.sub_type,
-                        "current_members": response_message.version
-                    },
-                    "glory_stats": {
-                        "total_glory": response_message.total_playtime,
-                        "weekly_glory": response_message.energy,
-                        "guild_xp": response_message.balance
-                    },
-                    "notice": response_message.welcome_message,
+                    url = f"https://{domain}/GetClanInfoByClanID"
+                    headers["Host"] = domain
+                    response = requests.post(url, headers=headers, data=request_bytes, verify=False, timeout=5)
                     
-                    "guild_leader": response_message.status_code,
-                    "acting_leader": response_message.value_a,
-                    "guild_officers": officers_list,
-                    
-                    "system_info": {
-                        "error_code": response_message.error_code
-                    }
-                }
-                
-                return Response(json.dumps(formatted_response, sort_keys=False, indent=4), mimetype='application/json')
-            else:
-                return jsonify({"error": "No content in response from Free Fire server"}), 500
+                    if response.status_code == 200 and response.content:
+                        response_message = data_pb2.response()
+                        response_message.ParseFromString(response.content)
+                        
+                        if response_message.id != 0 or response_message.special_code:
+                            timestamp1_normal = datetime.fromtimestamp(response_message.timestamp1)
+                            timestamp2_normal = datetime.fromtimestamp(response_message.timestamp2)
+                            
+                            try:
+                                officers_list = json.loads(response_message.big_numbers) if response_message.big_numbers else []
+                            except Exception:
+                                officers_list = response_message.big_numbers
 
-        else:
-            return jsonify({"error": f"Failed to fetch data: {response.status_code}"}), response.status_code
+                            formatted_response = {
+                                "Developer": "Riduanul Islam",
+                                "TelegramBot": "https://t.me/RiduanFFBot",
+                                "TelegramChannel": "https://t.me/RiduanOfficialBD",
+                                "guild_info": {
+                                    "guild_name": response_message.special_code,
+                                    "guild_id": response_message.id,
+                                    "level": response_message.rank,
+                                    "region": response_message.region,
+                                    "creation_date": timestamp1_normal.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "last_updated": timestamp2_normal.strftime("%Y-%m-%d %H:%M:%S")
+                                },
+                                "guild_members": {
+                                    "max_capacity": response_message.sub_type,
+                                    "current_members": response_message.version
+                                },
+                                "glory_stats": {
+                                    "total_glory": response_message.total_playtime,
+                                    "weekly_glory": response_message.energy,
+                                    "guild_xp": response_message.balance
+                                },
+                                "notice": response_message.welcome_message,
+                                
+                                "guild_leader": response_message.status_code,
+                                "acting_leader": response_message.value_a,
+                                "guild_officers": officers_list,
+                                
+                                "system_info": {
+                                    "error_code": response_message.error_code
+                                }
+                            }
+                            
+                            return Response(json.dumps(formatted_response, sort_keys=False, indent=4), mimetype='application/json')
+                        else:
+                            break
+                            
+                    elif response.status_code == 401:
+                        TOKENS[server]["token"] = None
+                        TOKENS[server]["expiry"] = 0
+                        break
+                        
+                except Exception:
+                    continue
+                    
+        return jsonify({"error": "Clan ID not found on any active servers."}), 404
 
     except Exception as e:
         return jsonify({
@@ -309,3 +296,4 @@ def get_clan_info():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+        
